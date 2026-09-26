@@ -3,101 +3,234 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Keyword Cloud</title>
+<title>Keywords Play</title>
+<meta name="description" content="Make a keyword cloud around a center word, then save it or export a PNG.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#ece6e1; --panel:#ffffff; --text:#2b1512; --muted:#7b6863; --line:#dcd1ca; --accent:#8e1426; --accent-text:#ffffff;
-  box-sizing:border-box;
-  padding-top:env(safe-area-inset-top,0px);
-  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f5f1ee; --bg-dot:rgba(92,6,18,.07); --panel:#ffffff; --panel-2:#faf7f5; --text:#241413; --muted:#7d6b66; --line:#e9e1dc;
+  --accent:#8e1426; --accent-2:#b4233b; --accent-soft:rgba(142,20,38,.08); --accent-text:#ffffff;
+  --warn-bg:#fdf3e4; --warn-text:#8a5a12;
+  --shadow:0 1px 2px rgba(40,12,10,.05),0 8px 24px rgba(40,12,10,.07);
+  --shadow-lg:0 2px 6px rgba(40,12,10,.06),0 24px 60px rgba(40,12,10,.14);
+  --ui:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#1a1312; --panel:#261c1a; --text:#f2e8e3; --muted:#a8958f; --line:#3d2f2c; --accent:#c42a40; --accent-text:#ffffff;
+    --bg:#141011; --bg-dot:rgba(255,255,255,.05); --panel:#1d1718; --panel-2:#241d1e; --text:#f3eae6; --muted:#a3918c; --line:#322828;
+    --accent:#c42a40; --accent-2:#e04860; --accent-soft:rgba(224,72,96,.12);
+    --warn-bg:rgba(200,144,10,.12); --warn-text:#e3b458;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+    --shadow-lg:0 2px 6px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
+    color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#1a1312; --panel:#261c1a; --text:#f2e8e3; --muted:#a8958f; --line:#3d2f2c; --accent:#c42a40; --accent-text:#ffffff;
+  --bg:#141011; --bg-dot:rgba(255,255,255,.05); --panel:#1d1718; --panel-2:#241d1e; --text:#f3eae6; --muted:#a3918c; --line:#322828;
+  --accent:#c42a40; --accent-2:#e04860; --accent-soft:rgba(224,72,96,.12);
+  --warn-bg:rgba(200,144,10,.12); --warn-text:#e3b458;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+  --shadow-lg:0 2px 6px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
+  color-scheme:dark;
 }
-html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
-*,*::before,*::after{box-sizing:inherit}
-body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Oswald','Arial Narrow',Impact,sans-serif;}
-.wrap{max-width:900px;height:100%;margin:0 auto;padding:8px;display:flex;flex-direction:column;gap:8px}
-#area{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
-.panel{flex:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
-.row{display:flex;gap:6px;align-items:center}
-label{font-size:13px;color:var(--muted);width:74px;flex:none;line-height:1.1}
-input[type=text]{flex:1;min-width:0;font:500 18px 'Oswald','Arial Narrow',sans-serif;color:var(--text);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
-input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px}
-button{font:500 16px 'Oswald','Arial Narrow',sans-serif;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--text);padding:6px 12px;cursor:pointer;flex:none}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:var(--bg);color:var(--text);font:400 14px/1.4 var(--ui);-webkit-font-smoothing:antialiased}
+.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- layout ---- */
+.app{display:grid;grid-template-columns:340px minmax(0,1fr);height:100vh;height:100dvh}
+.side{display:flex;flex-direction:column;gap:18px;min-height:0;overflow-y:auto;padding:22px 20px;background:var(--panel);border-right:1px solid var(--line);
+  padding-top:max(22px,env(safe-area-inset-top));padding-bottom:max(22px,env(safe-area-inset-bottom))}
+#area{min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;padding:28px;
+  background-image:radial-gradient(var(--bg-dot) 1px,transparent 1px);background-size:18px 18px}
+body.clean .app{grid-template-columns:minmax(0,1fr)}
+body.clean .side{display:none}
+
+/* ---- brand ---- */
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(135deg,var(--accent-2),var(--accent) 55%,#5c0612);box-shadow:0 4px 12px rgba(142,20,38,.3)}
+.logo .i{width:22px;height:22px}
+.brand h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.brand p{margin:1px 0 0;font-size:12.5px;color:var(--muted)}
+.brand .grow{flex:1;min-width:0}
+
+/* ---- fields ---- */
+.field{display:flex;flex-direction:column;gap:6px}
+.field>label,.sec-h{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.input,.combo{display:flex;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;transition:border-color .15s,box-shadow .15s}
+.input:focus-within,.combo:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.input input,.combo input{flex:1;min-width:0;border:0;background:transparent;color:var(--text);font:500 15px var(--ui);padding:11px 13px;outline:none}
+.input input::placeholder,.combo input::placeholder{color:var(--muted);font-weight:400}
+.combo{padding:4px}
+.combo input{padding:7px 9px}
+
+/* ---- buttons ---- */
+button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
-.tools{margin-top:6px}
-.tools button{flex:1;padding:5px 4px;font-size:14px}
-#frame{position:relative;flex:none;background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 14px rgba(40,10,10,.12)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:10px;
+  padding:9px 10px;font-weight:500;font-size:13.5px;transition:background .15s,border-color .15s,transform .08s}
+.btn:hover{background:var(--panel-2)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text);box-shadow:0 2px 8px rgba(142,20,38,.25)}
+.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.combo .btn{padding:8px 13px}
+.icon-btn{width:38px;height:38px;padding:0;flex:none}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+
+/* ---- keyword chips ---- */
+.sec{display:flex;flex-direction:column;gap:10px;min-height:0}
+.sec-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.count{font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:1px 8px;font-size:11.5px;margin-left:4px}
+#chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 4px 4px 10px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);font-size:13px;font-weight:500}
+.chip .dot{width:8px;height:8px;border-radius:50%;flex:none;box-shadow:0 0 0 1px rgba(128,128,128,.35)}
+.chip .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip button{display:grid;place-items:center;width:20px;height:20px;border:0;border-radius:50%;background:transparent;color:var(--muted);padding:0;flex:none}
+.chip button:hover{background:var(--accent-soft);color:var(--accent)}
+.chip button .i{width:13px;height:13px;stroke-width:2.5}
+.chip.off{border-style:dashed;color:var(--muted)}
+.chip.off .dot{background:transparent!important;border:1.5px dashed currentColor}
+.empty{color:var(--muted);font-size:13px;margin:0}
+.hint{color:var(--muted);font-size:12px;font-weight:400;letter-spacing:0;margin:0}
+#status{margin:0;font-size:12.5px;line-height:1.45;padding:9px 11px;border-radius:10px;background:var(--warn-bg);color:var(--warn-text)}
+#status:empty{display:none}
+
+/* ---- canvas ---- */
+#frame{position:relative;flex:none;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:var(--shadow-lg);outline:1px solid rgba(0,0,0,.04)}
 #stage{position:absolute;left:0;top:0;width:900px;height:1100px;transform-origin:0 0}
-.w{position:absolute;white-space:nowrap;line-height:.86;font-weight:600;letter-spacing:-.01em;cursor:pointer;user-select:none}
-.w .in{display:block}
+.w{position:absolute;white-space:nowrap;font-family:'Oswald','Arial Narrow',Impact,sans-serif;line-height:.86;font-weight:600;letter-spacing:-.01em;cursor:pointer;user-select:none;-webkit-user-select:none}
+.w .in{display:block;transition:opacity .15s}
+.w:not(.center):hover .in{opacity:.4}
 .w.new .in{animation:pop .55s cubic-bezier(.2,1.5,.45,1) both}
 .w.center{cursor:default}
 #meas{visibility:hidden;position:absolute;left:0;top:0}
 @keyframes pop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
-@media (prefers-reduced-motion: reduce){.w.new .in{animation:none}}
-#pngModal{position:fixed;inset:0;background:rgba(20,8,6,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+
+#showCtrl{display:none;position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));box-shadow:var(--shadow);z-index:5}
+body.clean #showCtrl{display:inline-flex}
+
+/* ---- PNG dialog ---- */
+#pngModal{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:rgba(20,8,6,.4);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:fade .15s ease-out}
 #pngModal[hidden]{display:none}
-#pngImg{display:block;width:auto;max-width:100%;max-height:52vh;margin:0 auto;border-radius:6px;border:1px solid var(--line);background:#fff}
-.sheet{background:var(--panel);color:var(--text);border-radius:12px;width:100%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line)}
-.sheet h2{margin:0;font-size:20px;font-weight:600}
-.msg{font:13px system-ui,sans-serif;color:var(--muted);margin:0}
-#status{margin-top:6px}
-#status:empty{display:none}
-body.clean .ctrl{display:none}
-#showCtrl{display:none;position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel);opacity:.85}
-body.clean #showCtrl{display:block}
+.sheet{background:var(--panel);color:var(--text);border-radius:20px;width:100%;max-width:420px;max-height:calc(100dvh - 32px);display:flex;flex-direction:column;gap:14px;padding:18px;
+  border:1px solid var(--line);box-shadow:var(--shadow-lg);animation:rise .2s cubic-bezier(.2,.9,.3,1)}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sheet h2{margin:0;font-size:16px;font-weight:600}
+.sheet .icon-btn{width:32px;height:32px;border:0;background:transparent}
+.sheet .icon-btn:hover{background:var(--panel-2)}
+#pngImg{display:block;width:auto;max-width:100%;max-height:55vh;margin:0 auto;border-radius:12px;border:1px solid var(--line);background:#fff}
+.sheet .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(10px) scale(.98)}}
+@media (prefers-reduced-motion: reduce){.w.new .in,#pngModal,.sheet{animation:none}}
+
+/* ---- phones & narrow windows ---- */
+@media (max-width: 879px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  body.clean .app{grid-template-rows:minmax(0,1fr)}
+  .side{gap:10px;padding:12px 14px;border-right:0;border-bottom:1px solid var(--line);overflow:visible;
+    padding-top:max(12px,env(safe-area-inset-top));padding-bottom:12px;box-shadow:var(--shadow);z-index:1}
+  .logo{width:32px;height:32px;border-radius:10px}
+  .logo .i{width:18px;height:18px}
+  .brand h1{font-size:15px}
+  .brand p{display:none}
+  .icon-btn{width:34px;height:34px}
+  .field{flex-direction:row;align-items:center;gap:10px}
+  .field>label{width:62px;flex:none;line-height:1.2}
+  .field>.input,.field>.combo{flex:1;min-width:0}
+  .input input{padding:8px 11px}
+  .combo input{padding:5px 8px}
+  .combo .btn{padding:6px 11px}
+  .tools{grid-template-columns:repeat(6,1fr);gap:6px}
+  .tools .btn{flex-direction:column;gap:3px;padding:7px 2px;font-size:11px}
+  .sec{gap:6px}
+  .sec-h .hint{display:none}
+  #chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px}
+  #chips::-webkit-scrollbar{display:none}
+  .chip{flex:none}
+  #area{padding:14px 14px max(14px,env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="panel ctrl">
-    <div class="row">
-      <label for="center">Center word</label>
-      <input type="text" id="center" value="Key Points" autocomplete="off">
-    </div>
-    <div class="row" style="margin-top:6px">
-      <label for="kw">Add keyword</label>
-      <input type="text" id="kw" placeholder="Word, or several with commas" autocomplete="off" enterkeyhint="done">
-      <button class="primary" id="add">Add</button>
-    </div>
-    <div class="row tools">
-      <button id="undo">Undo</button>
-      <button id="shuffle">Shuffle</button>
-      <button id="clear">Clear</button>
-      <button id="save" title="Save the keywords as a CSV file (opens in Excel or Notepad)">Save</button>
-      <button id="open" title="Open a saved .csv or .txt file">Open</button>
-      <button id="png">PNG</button>
-      <button id="clean">Hide</button>
-    </div>
-    <p class="msg" id="status" role="status"></p>
-    <input type="file" id="file" accept=".csv,.txt,text/csv,text/plain" hidden>
-  </div>
-  <div id="area"><div id="frame"><div id="stage"><span id="meas" class="w"></span></div></div></div>
-</div>
-<button id="showCtrl">Show controls</button>
-<div id="pngModal" hidden>
-  <div class="sheet" role="dialog" aria-label="Export PNG">
-    <h2>Export PNG</h2>
-    <img id="pngImg" alt="Keyword cloud image">
-    <p class="msg">Tap Download, or right-click / long-press the image to save it.</p>
-    <div class="row">
-      <button class="primary" id="pngDl" style="flex:1">Download PNG</button>
-      <button id="pngClose" style="flex:1">Close</button>
-    </div>
-  </div>
-</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+</svg>
 
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo"><svg class="i"><use href="#i-cloud"/></svg></div>
+      <div class="grow">
+        <h1>Keywords Play</h1>
+        <p>Keyword cloud maker</p>
+      </div>
+      <button class="btn icon-btn" id="clean" title="Hide controls (clean view)" aria-label="Hide controls"><svg class="i"><use href="#i-expand"/></svg></button>
+    </div>
+
+    <div class="field">
+      <label for="center">Center word</label>
+      <div class="input"><input type="text" id="center" value="Key Points" autocomplete="off"></div>
+    </div>
+    <div class="field">
+      <label for="kw">Add keyword</label>
+      <div class="combo">
+        <input type="text" id="kw" placeholder="Word, or several with commas" autocomplete="off" enterkeyhint="done">
+        <button class="btn primary" id="add"><svg class="i"><use href="#i-plus"/></svg>Add</button>
+      </div>
+    </div>
+
+    <div class="tools">
+      <button class="btn" id="undo" title="Undo the last change"><svg class="i"><use href="#i-undo"/></svg>Undo</button>
+      <button class="btn" id="shuffle" title="New layout, colors and rotations"><svg class="i"><use href="#i-shuffle"/></svg>Shuffle</button>
+      <button class="btn" id="clear" title="Remove all keywords (Undo brings them back)"><svg class="i"><use href="#i-trash"/></svg>Clear</button>
+      <button class="btn" id="open" title="Open a saved .csv or .txt file"><svg class="i"><use href="#i-open"/></svg>Open</button>
+      <button class="btn" id="save" title="Save the keywords as a CSV file (opens in Excel or Notepad)"><svg class="i"><use href="#i-save"/></svg>Save</button>
+      <button class="btn" id="png" title="Export the cloud as a PNG image"><svg class="i"><use href="#i-image"/></svg>PNG</button>
+    </div>
+
+    <p id="status" role="status"></p>
+
+    <div class="sec">
+      <div class="sec-h"><span>Keywords<span class="count" id="count">0</span></span><span class="hint">Click a word or × to remove</span></div>
+      <div id="chips"></div>
+    </div>
+    <input type="file" id="file" accept=".csv,.txt,text/csv,text/plain" hidden>
+  </aside>
+  <main id="area"><div id="frame"><div id="stage"><span id="meas" class="w"></span></div></div></main>
+</div>
+<button class="btn" id="showCtrl"><svg class="i"><use href="#i-sliders"/></svg>Show controls</button>
+
+<div id="pngModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pngTitle">
+    <div class="sheet-h">
+      <h2 id="pngTitle">Export PNG</h2>
+      <button class="btn icon-btn" id="pngClose" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
+    </div>
+    <img id="pngImg" alt="Keyword cloud image">
+    <p class="hint">1800 × 2200 px. Click Download, or right-click / long-press the image to save it.</p>
+    <div class="actions">
+      <button class="btn" id="pngCancel">Close</button>
+      <button class="btn primary" id="pngDl"><svg class="i"><use href="#i-save"/></svg>Download</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const W=900,H=1100,CX=W/2,CY=H/2,PAD=4,MARGIN=14;
@@ -122,10 +255,34 @@ function snapshot(){history.push(JSON.stringify(state));if(history.length>50)his
 // shows msg, or else lists keywords that currently have no room in the cloud
 function setStatus(msg){
   const hidden=state.words.filter(w=>!w.p).map(w=>w.text);
-  statusEl.textContent=msg||(hidden.length?`No room for: ${hidden.join(', ')}. Shuffle, or tap a word to remove it.`:'');
+  const names=hidden.length>5?`${hidden.slice(0,5).join(', ')} and ${hidden.length-5} more`:hidden.join(', ');
+  statusEl.textContent=msg||(hidden.length?`No room for: ${names}. Shuffle, or remove a word to make space.`:'');
+  renderChips();
+}
+function removeWord(id){snapshot();state.words=state.words.filter(x=>x.id!==id);save();layout(false,true);setStatus()}
+// sidebar list of every keyword; dashed chips are the ones with no room in the cloud
+function renderChips(){
+  const box=$('chips');box.textContent='';
+  $('count').textContent=state.words.length;
+  if(!state.words.length){const p=document.createElement('p');p.className='empty';p.textContent='No keywords yet. Add some above.';box.appendChild(p);return}
+  state.words.forEach(wd=>{
+    const chip=document.createElement('span');chip.className='chip'+(wd.p?'':' off');
+    if(!wd.p)chip.title='No room in the cloud';
+    const dot=document.createElement('span');dot.className='dot';dot.style.background=wd.color;
+    const t=document.createElement('span');t.className='t';t.textContent=wd.text;
+    const x=document.createElement('button');x.setAttribute('aria-label',`Remove ${wd.text}`);
+    x.innerHTML='<svg class="i"><use href="#i-x"/></svg>';x.onclick=()=>removeWord(wd.id);
+    chip.append(dot,t,x);box.appendChild(chip);
+  });
 }
 
-function fit(){const s=Math.min(area.clientWidth/W,area.clientHeight/H);stage.style.transform=`scale(${s})`;frame.style.width=(W*s)+'px';frame.style.height=(H*s)+'px'}
+function fit(){
+  const cs=getComputedStyle(area);
+  const aw=area.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const ah=area.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const s=Math.max(0.05,Math.min(aw/W,ah/H));
+  stage.style.transform=`scale(${s})`;frame.style.width=(W*s)+'px';frame.style.height=(H*s)+'px';
+}
 
 function measure(text,size,weight){
   meas.style.fontSize=size+'px';meas.style.fontWeight=weight;meas.textContent=text;
@@ -182,7 +339,7 @@ function drawWord(wd,p,isNew,isCenter){
   if(wd.rot)el.style.transform='rotate(90deg)';
   const inner=document.createElement('span');inner.className='in';inner.textContent=wd.text;
   el.appendChild(inner);
-  if(!isCenter){el.title='Tap to remove';el.addEventListener('click',()=>{snapshot();state.words=state.words.filter(x=>x.id!==wd.id);save();layout(false,true);setStatus()})}
+  if(!isCenter){el.title='Click to remove';el.addEventListener('click',()=>removeWord(wd.id))}
   stage.appendChild(el);
 }
 // reuse=true keeps each word where it was placed before
@@ -194,7 +351,8 @@ function layout(animateAll,reuse){
   const size=Math.min(300,200*(W*0.86)/Math.max(t.w,1));
   const m=measure(c,size,700);
   const box={x:CX-m.w/2,y:CY-m.h/2,w:m.w,h:m.h};
-  boxes.push(box);
+  // collision box is taller than the tight line box so descenders (y, g, p) don't touch other words
+  boxes.push({x:box.x,y:box.y-size*.03,w:box.w,h:box.h+size*.16});
   drawWord({text:c,weight:700,color:'#5c0612',rot:false},{size,box,m},false,true);
   if(reuse){state.words.forEach(wd=>{if(wd.p)boxes.push(wd.p.box)})}
   const order=[...state.words].sort((a,b)=>b.size-a.size);
@@ -274,12 +432,14 @@ $('png').onclick=()=>{
     if(!b)return;
     if(pngUrl)URL.revokeObjectURL(pngUrl);
     pngUrl=URL.createObjectURL(b);
-    $('pngImg').src=pngUrl;$('pngModal').hidden=false;
+    $('pngImg').src=pngUrl;$('pngModal').hidden=false;$('pngDl').focus();
   },'image/png');
 };
 $('pngDl').onclick=()=>{if(pngUrl)download(pngUrl,pngName)};
-$('pngClose').onclick=()=>{$('pngModal').hidden=true};
-$('pngModal').addEventListener('click',e=>{if(e.target===$('pngModal'))$('pngModal').hidden=true});
+function closePng(){$('pngModal').hidden=true;$('png').focus()}
+$('pngClose').onclick=closePng;$('pngCancel').onclick=closePng;
+$('pngModal').addEventListener('click',e=>{if(e.target===$('pngModal'))closePng()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('pngModal').hidden)closePng()});
 
 // ---------- Save / Open as a CSV file (Excel or Notepad) ----------
 // Format: a header row, one "Center" row, then one "Keyword" row per word.

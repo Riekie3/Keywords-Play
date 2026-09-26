@@ -2,7 +2,9 @@
 
 A single-page keyword cloud builder. Type a center word, add keywords (comma-separated for several at once), and they spiral out around it.
 
-Just open `index.html` in a browser — no install, no build step, no account.
+**Live:** https://riekie3.github.io/Keywords-Play/
+
+Or just open `index.html` in a browser — no install, no build step, no account.
 
 - **Add** — add one keyword, or several separated by commas
 - **Tap a word** to remove it

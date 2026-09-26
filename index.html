@@ -46,8 +46,9 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--a
 #meas{visibility:hidden;position:absolute;left:0;top:0}
 @keyframes pop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion: reduce){.w.new .in{animation:none}}
-#modal{position:fixed;inset:0;background:rgba(20,8,6,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
-#modal[hidden]{display:none}
+#modal,#pngModal{position:fixed;inset:0;background:rgba(20,8,6,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+#modal[hidden],#pngModal[hidden]{display:none}
+#pngImg{display:block;width:auto;max-width:100%;max-height:52vh;margin:0 auto;border-radius:6px;border:1px solid var(--line);background:#fff}
 .sheet{background:var(--panel);color:var(--text);border-radius:12px;width:100%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line)}
 .sheet h2{margin:0;font-size:20px;font-weight:600}
 #list{overflow-y:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:6px}
@@ -79,12 +80,24 @@ body.clean #showCtrl{display:block}
       <button id="shuffle">Shuffle</button>
       <button id="clear">Clear</button>
       <button id="saved">Save / Open</button>
+      <button id="png">PNG</button>
       <button id="clean">Hide</button>
     </div>
   </div>
   <div id="area"><div id="frame"><div id="stage"><span id="meas" class="w"></span></div></div></div>
 </div>
 <button id="showCtrl">Show controls</button>
+<div id="pngModal" hidden>
+  <div class="sheet" role="dialog" aria-label="Export PNG">
+    <h2>Export PNG</h2>
+    <img id="pngImg" alt="Keyword cloud image">
+    <p class="msg">Tap Download, or right-click / long-press the image to save it.</p>
+    <div class="row">
+      <button class="primary" id="pngDl" style="flex:1">Download PNG</button>
+      <button id="pngClose" style="flex:1">Close</button>
+    </div>
+  </div>
+</div>
 <div id="modal" hidden>
   <div class="sheet" role="dialog" aria-label="Saved clouds">
     <h2>Saved clouds</h2>
@@ -216,6 +229,47 @@ $('clear').onclick=()=>{if(state.words.length&&!confirm('Remove all keywords? Sa
 $('clean').onclick=()=>{document.body.classList.add('clean');fit()};
 $('showCtrl').onclick=()=>{document.body.classList.remove('clean');fit()};
 window.addEventListener('resize',fit);
+
+// ---------- PNG export ----------
+const EXPORT_SCALE=2;
+let pngUrl=null,pngName='keyword-cloud.png';
+function drawText(ctx,text,size,weight,color,cx,cy,rot){
+  ctx.font=`${weight} ${size}px Oswald, 'Arial Narrow', sans-serif`;
+  ctx.fillStyle=color;ctx.textAlign='center';
+  if('letterSpacing' in ctx)ctx.letterSpacing=(-0.01*size)+'px';
+  ctx.save();ctx.translate(cx,cy);if(rot)ctx.rotate(Math.PI/2);
+  // match CSS, where the font's ascent+descent is centred in the line box
+  const fm=ctx.measureText(text);
+  if(fm.fontBoundingBoxAscent!=null){ctx.textBaseline='alphabetic';ctx.fillText(text,0,(fm.fontBoundingBoxAscent-fm.fontBoundingBoxDescent)/2)}
+  else{ctx.textBaseline='middle';ctx.fillText(text,0,0)}
+  ctx.restore();
+}
+function renderPng(){
+  const cv=document.createElement('canvas');cv.width=W*EXPORT_SCALE;cv.height=H*EXPORT_SCALE;
+  const ctx=cv.getContext('2d');ctx.scale(EXPORT_SCALE,EXPORT_SCALE);
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+  const c=state.center.trim();
+  if(c){
+    const t=measure(c,200,700);
+    const size=Math.min(300,200*(W*0.86)/Math.max(t.w,1));
+    drawText(ctx,c,size,700,'#5c0612',CX,CY,false);
+  }
+  state.words.forEach(wd=>{if(!wd.p)return;const b=wd.p.box;drawText(ctx,wd.text,wd.p.size,wd.weight,wd.color,b.x+b.w/2,b.y+b.h/2,wd.rot)});
+  return cv;
+}
+$('png').onclick=()=>{
+  const cv=renderPng();
+  pngName=((state.center.trim()||'keyword-cloud').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')||'keyword-cloud')+'.png';
+  cv.toBlob(b=>{
+    if(!b)return;
+    if(pngUrl)URL.revokeObjectURL(pngUrl);
+    pngUrl=URL.createObjectURL(b);
+    $('pngImg').src=pngUrl;$('pngModal').hidden=false;
+  },'image/png');
+};
+$('pngDl').onclick=()=>{if(!pngUrl)return;const a=document.createElement('a');a.href=pngUrl;a.download=pngName;document.body.appendChild(a);a.click();a.remove()};
+$('pngClose').onclick=()=>{$('pngModal').hidden=true};
+$('pngModal').addEventListener('click',e=>{if(e.target===$('pngModal'))$('pngModal').hidden=true});
 
 // ---------- Saved clouds ----------
 const modal=$('modal'),list=$('list'),msg=$('saveMsg'),nameIn=$('saveName');

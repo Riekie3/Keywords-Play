@@ -46,18 +46,14 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--a
 #meas{visibility:hidden;position:absolute;left:0;top:0}
 @keyframes pop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion: reduce){.w.new .in{animation:none}}
-#modal,#pngModal{position:fixed;inset:0;background:rgba(20,8,6,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
-#modal[hidden],#pngModal[hidden]{display:none}
+#pngModal{position:fixed;inset:0;background:rgba(20,8,6,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+#pngModal[hidden]{display:none}
 #pngImg{display:block;width:auto;max-width:100%;max-height:52vh;margin:0 auto;border-radius:6px;border:1px solid var(--line);background:#fff}
 .sheet{background:var(--panel);color:var(--text);border-radius:12px;width:100%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line)}
 .sheet h2{margin:0;font-size:20px;font-weight:600}
-#list{overflow-y:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:6px}
-.item{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-.item .meta{flex:1;min-width:0}
-.item .nm{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.item .sub{font:12px system-ui,sans-serif;color:var(--muted)}
-.item button{padding:5px 10px;font-size:14px}
 .msg{font:13px system-ui,sans-serif;color:var(--muted);margin:0}
+#status{margin-top:6px}
+#status:empty{display:none}
 body.clean .ctrl{display:none}
 #showCtrl{display:none;position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel);opacity:.85}
 body.clean #showCtrl{display:block}
@@ -79,10 +75,13 @@ body.clean #showCtrl{display:block}
       <button id="undo">Undo</button>
       <button id="shuffle">Shuffle</button>
       <button id="clear">Clear</button>
-      <button id="saved">Save / Open</button>
+      <button id="save" title="Save the keywords as a CSV file (opens in Excel or Notepad)">Save</button>
+      <button id="open" title="Open a saved .csv or .txt file">Open</button>
       <button id="png">PNG</button>
       <button id="clean">Hide</button>
     </div>
+    <p class="msg" id="status" role="status"></p>
+    <input type="file" id="file" accept=".csv,.txt,text/csv,text/plain" hidden>
   </div>
   <div id="area"><div id="frame"><div id="stage"><span id="meas" class="w"></span></div></div></div>
 </div>
@@ -98,18 +97,6 @@ body.clean #showCtrl{display:block}
     </div>
   </div>
 </div>
-<div id="modal" hidden>
-  <div class="sheet" role="dialog" aria-label="Saved clouds">
-    <h2>Saved clouds</h2>
-    <div class="row">
-      <input type="text" id="saveName" placeholder="Name this cloud" autocomplete="off">
-      <button class="primary" id="doSave">Save</button>
-    </div>
-    <p class="msg" id="saveMsg"></p>
-    <div id="list"></div>
-    <button id="closeModal">Close</button>
-  </div>
-</div>
 
 
 <script>
@@ -120,14 +107,18 @@ const stage=$('stage'),frame=$('frame'),meas=$('meas'),area=$('area');
 const centerIn=$('center'),kwIn=$('kw');
 let state={center:'Key Points',words:[]};
 let boxes=[];
-let db=null,uid=null,cloudsCol=null,currentDoc=null,savedList=[],syncTimer=null;
+let history=[],pendingCenter=null;
+const statusEl=$('status');
 
-function clone(o){return JSON.parse(JSON.stringify(o))}
-function save(){
-  try{localStorage.setItem('kwcloud',JSON.stringify(state))}catch(e){}
-  if(currentDoc){clearTimeout(syncTimer);syncTimer=setTimeout(()=>{currentDoc.set(clone(state)).catch(()=>{})},800)}
-}
+function save(){try{localStorage.setItem('kwcloud',JSON.stringify(state))}catch(e){}}
 function loadLocal(){try{const s=JSON.parse(localStorage.getItem('kwcloud')||'null');if(s&&s.words)state=s}catch(e){}}
+// call before any change so Undo can step back to it
+function snapshot(){history.push(JSON.stringify(state));if(history.length>50)history.shift()}
+// shows msg, or else lists keywords that currently have no room in the cloud
+function setStatus(msg){
+  const hidden=state.words.filter(w=>!w.p).map(w=>w.text);
+  statusEl.textContent=msg||(hidden.length?`No room for: ${hidden.join(', ')}. Shuffle, or tap a word to remove it.`:'');
+}
 
 function fit(){const s=Math.min(area.clientWidth/W,area.clientHeight/H);stage.style.transform=`scale(${s})`;frame.style.width=(W*s)+'px';frame.style.height=(H*s)+'px'}
 
@@ -186,7 +177,7 @@ function drawWord(wd,p,isNew,isCenter){
   if(wd.rot)el.style.transform='rotate(90deg)';
   const inner=document.createElement('span');inner.className='in';inner.textContent=wd.text;
   el.appendChild(inner);
-  if(!isCenter){el.title='Tap to remove';el.addEventListener('click',()=>{state.words=state.words.filter(x=>x.id!==wd.id);save();layout(false,true)})}
+  if(!isCenter){el.title='Tap to remove';el.addEventListener('click',()=>{snapshot();state.words=state.words.filter(x=>x.id!==wd.id);save();layout(false,true);setStatus()})}
   stage.appendChild(el);
 }
 // reuse=true keeps each word where it was placed before
@@ -211,24 +202,38 @@ function layout(animateAll,reuse){
 function addWords(){
   const parts=kwIn.value.split(',').map(s=>s.trim()).filter(Boolean);
   if(!parts.length)return;
-  let failed=0;
+  snapshot();
   parts.forEach((txt,i)=>{
     const wd=makeWord(txt);
-    const p=placeWord(wd);
-    if(p){wd.p=p;state.words.push(wd);setTimeout(()=>drawWord(wd,p,true,false),i*120)}else failed++;
+    // words with no room are kept (p=null), listed in the status line and retried on every layout
+    wd.p=placeWord(wd);state.words.push(wd);
+    if(wd.p)setTimeout(()=>drawWord(wd,wd.p,true,false),i*120);
   });
-  save();kwIn.value='';kwIn.focus();
-  if(failed)kwIn.placeholder='Cloud is full. Remove a word or shuffle.';
+  save();setStatus();kwIn.value='';kwIn.focus();
 }
 $('add').onclick=addWords;
 kwIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addWords()}});
-centerIn.addEventListener('input',()=>{state.center=centerIn.value;save();layout(false,false)});
-$('undo').onclick=()=>{state.words.pop();save();layout(false,true)};
-$('shuffle').onclick=()=>{state.words.forEach(w=>{w.rot=Math.random()<.28;w.color=PALETTE[Math.floor(Math.random()*PALETTE.length)]});layout(true,false);save()};
-$('clear').onclick=()=>{if(state.words.length&&!confirm('Remove all keywords? Saved clouds are not affected.'))return;state.words=[];save();layout(false,true)};
+centerIn.addEventListener('focus',()=>{pendingCenter=JSON.stringify(state)});
+centerIn.addEventListener('input',()=>{
+  if(pendingCenter){history.push(pendingCenter);pendingCenter=null}
+  state.center=centerIn.value;save();layout(false,false);setStatus();
+});
+$('undo').onclick=()=>{
+  if(!history.length){setStatus('Nothing to undo.');return}
+  state=JSON.parse(history.pop());centerIn.value=state.center;pendingCenter=null;
+  save();layout(false,true);setStatus();
+};
+$('shuffle').onclick=()=>{snapshot();state.words.forEach(w=>{w.rot=Math.random()<.28;w.color=PALETTE[Math.floor(Math.random()*PALETTE.length)]});layout(true,false);save();setStatus()};
+$('clear').onclick=()=>{
+  if(!state.words.length)return;
+  snapshot();state.words=[];save();layout(false,true);
+  setStatus('Cleared. Press Undo to bring the keywords back.');
+};
 $('clean').onclick=()=>{document.body.classList.add('clean');fit()};
 $('showCtrl').onclick=()=>{document.body.classList.remove('clean');fit()};
 window.addEventListener('resize',fit);
+
+function fileBase(){return (state.center.trim()||'keyword-cloud').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')||'keyword-cloud'}
 
 // ---------- PNG export ----------
 const EXPORT_SCALE=2;
@@ -259,7 +264,7 @@ function renderPng(){
 }
 $('png').onclick=()=>{
   const cv=renderPng();
-  pngName=((state.center.trim()||'keyword-cloud').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')||'keyword-cloud')+'.png';
+  pngName=fileBase()+'.png';
   cv.toBlob(b=>{
     if(!b)return;
     if(pngUrl)URL.revokeObjectURL(pngUrl);
@@ -267,65 +272,66 @@ $('png').onclick=()=>{
     $('pngImg').src=pngUrl;$('pngModal').hidden=false;
   },'image/png');
 };
-$('pngDl').onclick=()=>{if(!pngUrl)return;const a=document.createElement('a');a.href=pngUrl;a.download=pngName;document.body.appendChild(a);a.click();a.remove()};
+$('pngDl').onclick=()=>{if(pngUrl)download(pngUrl,pngName)};
 $('pngClose').onclick=()=>{$('pngModal').hidden=true};
 $('pngModal').addEventListener('click',e=>{if(e.target===$('pngModal'))$('pngModal').hidden=true});
 
-// ---------- Saved clouds ----------
-const modal=$('modal'),list=$('list'),msg=$('saveMsg'),nameIn=$('saveName');
-function fmtDate(ts){try{return new Date(ts).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){return ''}}
-function renderList(){
-  list.textContent='';
-  if(!cloudsCol){msg.textContent='Saving to your account is not available in this view. Open the page from its claude.ai link to save and reopen clouds.';return}
-  if(!savedList.length){const p=document.createElement('p');p.className='msg';p.textContent='No saved clouds yet. Name this one and tap Save.';list.appendChild(p);return}
-  savedList.forEach(doc=>{
-    const d=doc.data();
-    const row=document.createElement('div');row.className='item';
-    const meta=document.createElement('div');meta.className='meta';
-    const nm=document.createElement('div');nm.className='nm';nm.textContent=d.name||'Untitled';
-    const sub=document.createElement('div');sub.className='sub';sub.textContent=`${d.center||''} · ${(d.words||[]).length} words · ${fmtDate(d.savedAt)}`;
-    meta.append(nm,sub);
-    const open=document.createElement('button');open.textContent='Open';
-    open.onclick=()=>{state={center:d.center||'',words:clone(d.words||[])};centerIn.value=state.center;save();layout(true,true);nameIn.value=d.name||'';modal.hidden=true};
-    const del=document.createElement('button');del.textContent='Delete';
-    del.onclick=async()=>{if(!confirm(`Delete "${d.name}"?`))return;try{await cloudsCol.doc(doc.id).delete()}catch(e){msg.textContent='Could not delete. Try again.'}};
-    row.append(meta,open,del);list.appendChild(row);
-  });
+// ---------- Save / Open as a CSV file (Excel or Notepad) ----------
+// Format: a header row, one "Center" row, then one "Keyword" row per word.
+// Size/Color/Rotated are optional; a plain .txt list (one word per line) also opens.
+function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove()}
+function csvCell(v){v=String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function parseCsvLine(line){
+  const out=[];let cur='',q=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(q){if(ch==='"'){if(line[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch==='"')q=true;
+    else if(ch===','||ch===';'||ch==='\t'){out.push(cur);cur=''}
+    else cur+=ch;
+  }
+  out.push(cur);return out.map(s=>s.trim());
 }
-$('saved').onclick=()=>{msg.textContent='';renderList();modal.hidden=false;nameIn.focus()};
-$('closeModal').onclick=()=>{modal.hidden=true};
-modal.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true});
-$('doSave').onclick=async()=>{
-  if(!cloudsCol){renderList();return}
-  const name=nameIn.value.trim();
-  if(!name){msg.textContent='Type a name first.';nameIn.focus();return}
-  const existing=savedList.find(d=>(d.data().name||'').toLowerCase()===name.toLowerCase());
-  if(existing&&!confirm(`Replace the saved cloud "${name}"?`))return;
-  const body={name,center:state.center,words:clone(state.words),savedAt:Date.now()};
-  try{
-    await (existing?cloudsCol.doc(existing.id):cloudsCol.doc()).set(body);
-    msg.textContent=`Saved "${name}".`;
-  }catch(e){msg.textContent=e&&e.code==='quota_exceeded'?'Storage is full. Delete an old cloud first.':'Could not save. Try again.'}
+$('save').onclick=()=>{
+  const rows=[['Type','Word','Size','Color','Rotated'],['Center',state.center,'','','']];
+  state.words.forEach(w=>rows.push(['Keyword',w.text,w.size,w.color,w.rot?'yes':'no']));
+  const text='﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n';
+  const url=URL.createObjectURL(new Blob([text],{type:'text/csv'}));
+  download(url,fileBase()+'.csv');setTimeout(()=>URL.revokeObjectURL(url),5000);
+  setStatus(`Downloaded ${fileBase()}.csv. Open it later with the Open button, or edit it in Excel or Notepad.`);
+};
+$('open').onclick=()=>$('file').click();
+$('file').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';
+  if(!f)return;
+  let text;try{text=await f.text()}catch(err){setStatus('Could not read that file.');return}
+  let center=null;const words=[];
+  text.replace(/^﻿/,'').split(/\r?\n/).forEach(line=>{
+    if(!line.trim())return;
+    const c=parseCsvLine(line);
+    const type=c.length>1?c[0].toLowerCase():'keyword';
+    const word=c.length>1?c[1]:c[0];
+    if(type==='type'||!word)return;
+    if(type==='center'){center=word;return}
+    const wd=makeWord(word);
+    const size=parseFloat(c[2]);if(size>=10&&size<=200)wd.size=Math.round(size);
+    if(/^#[0-9a-f]{6}$/i.test(c[3]||''))wd.color=c[3];
+    if(/^(yes|no)$/i.test(c[4]||''))wd.rot=/^yes$/i.test(c[4]);
+    words.push(wd);
+  });
+  if(center===null&&!words.length){setStatus('No keywords found in that file.');return}
+  snapshot();
+  state={center:center===null?state.center:center,words};
+  centerIn.value=state.center;save();layout(true,false);
+  const hidden=state.words.filter(w=>!w.p).length;
+  setStatus(`Opened ${f.name} (${words.length} keywords${hidden?`, ${hidden} with no room`:''}). Press Undo to go back.`);
 };
 
 (async()=>{
   loadLocal();centerIn.value=state.center;
   fit();
   try{await Promise.all([document.fonts.load('700 60px Oswald'),document.fonts.load('600 60px Oswald'),document.fonts.load('500 60px Oswald')]);}catch(e){}
-  layout(true,true);save();
-  try{
-    const [d,u]=await Promise.all([claude.use('db'),claude.use('user')]);
-    if(!d||!u)return;
-    const id=await u.id();
-    if(!id)return;
-    db=d;uid=id;
-    const profile=db.doc(`data/users/${uid}/profile`);
-    cloudsCol=profile.collection('clouds');
-    currentDoc=db.doc(`data/users/${uid}/current`);
-    const cur=await currentDoc.get();
-    if(cur.exists){const c=cur.data();if(c&&Array.isArray(c.words)){state=clone(c);centerIn.value=state.center;try{localStorage.setItem('kwcloud',JSON.stringify(state))}catch(e){};layout(false,true)}}
-    cloudsCol.orderBy('savedAt','desc').onSnapshot(snap=>{savedList=snap.docs;if(!modal.hidden)renderList()},()=>{});
-  }catch(e){}
+  layout(true,true);save();setStatus();
 })();
 </script>
 </body>

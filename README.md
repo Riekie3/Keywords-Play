@@ -4,6 +4,8 @@ A single-page keyword cloud builder. Type a center word, add keywords (comma-sep
 
 **Live:** https://riekie3.github.io/Keywords-Play/
 
+<p align="center"><a href="https://riekie3.github.io/Keywords-Play/"><img src="docs/screenshot.png" alt="Keywords Play screenshot: an example cloud around the center word Key Points" width="360"></a></p>
+
 Or just open `index.html` in a browser — no install, no build step, no account.
 
 - **Add** — add one keyword, or several separated by commas
@@ -17,7 +19,7 @@ Or just open `index.html` in a browser — no install, no build step, no account
 - **Hide** — hides the controls for a clean view
 
 If a keyword doesn't fit, it's listed under the buttons and retried whenever space frees up.
-The current cloud is also remembered in the browser between visits.
+The current cloud is also remembered in the browser between visits. First-time visitors see an example cloud; press **Clear** to start your own.
 
 ## Save file format
 

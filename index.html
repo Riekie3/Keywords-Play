@@ -111,7 +111,12 @@ let history=[],pendingCenter=null;
 const statusEl=$('status');
 
 function save(){try{localStorage.setItem('kwcloud',JSON.stringify(state))}catch(e){}}
-function loadLocal(){try{const s=JSON.parse(localStorage.getItem('kwcloud')||'null');if(s&&s.words)state=s}catch(e){}}
+// first-time visitors see an example cloud; Clear removes it
+const EXAMPLE=['Strategy','Growth','Teamwork','Customers','Innovation','Quality','Vision','Results','Trust','Focus','Planning','Goals','Data','Speed'];
+function loadLocal(){
+  let s=null;try{s=JSON.parse(localStorage.getItem('kwcloud')||'null')}catch(e){}
+  if(s&&s.words)state=s;else state={center:'Key Points',words:EXAMPLE.map(makeWord)};
+}
 // call before any change so Undo can step back to it
 function snapshot(){history.push(JSON.stringify(state));if(history.length>50)history.shift()}
 // shows msg, or else lists keywords that currently have no room in the cloud

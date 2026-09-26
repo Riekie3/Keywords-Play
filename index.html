@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keyword Cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#ece6e1; --panel:#ffffff; --text:#2b1512; --muted:#7b6863; --line:#dcd1ca; --accent:#8e1426; --accent-text:#ffffff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1a1312; --panel:#261c1a; --text:#f2e8e3; --muted:#a8958f; --line:#3d2f2c; --accent:#c42a40; --accent-text:#ffffff;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1a1312; --panel:#261c1a; --text:#f2e8e3; --muted:#a8958f; --line:#3d2f2c; --accent:#c42a40; --accent-text:#ffffff;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Oswald','Arial Narrow',Impact,sans-serif;}
+.wrap{max-width:900px;height:100%;margin:0 auto;padding:8px;display:flex;flex-direction:column;gap:8px}
+#area{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.panel{flex:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+.row{display:flex;gap:6px;align-items:center}
+label{font-size:13px;color:var(--muted);width:74px;flex:none;line-height:1.1}
+input[type=text]{flex:1;min-width:0;font:500 18px 'Oswald','Arial Narrow',sans-serif;color:var(--text);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px}
+button{font:500 16px 'Oswald','Arial Narrow',sans-serif;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--text);padding:6px 12px;cursor:pointer;flex:none}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+.tools{margin-top:6px}
+.tools button{flex:1;padding:5px 4px;font-size:14px}
+#frame{position:relative;flex:none;background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 14px rgba(40,10,10,.12)}
+#stage{position:absolute;left:0;top:0;width:900px;height:1100px;transform-origin:0 0}
+.w{position:absolute;white-space:nowrap;line-height:.86;font-weight:600;letter-spacing:-.01em;cursor:pointer;user-select:none}
+.w .in{display:block}
+.w.new .in{animation:pop .55s cubic-bezier(.2,1.5,.45,1) both}
+.w.center{cursor:default}
+#meas{visibility:hidden;position:absolute;left:0;top:0}
+@keyframes pop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion: reduce){.w.new .in{animation:none}}
+#modal{position:fixed;inset:0;background:rgba(20,8,6,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+#modal[hidden]{display:none}
+.sheet{background:var(--panel);color:var(--text);border-radius:12px;width:100%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line)}
+.sheet h2{margin:0;font-size:20px;font-weight:600}
+#list{overflow-y:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.item{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.item .meta{flex:1;min-width:0}
+.item .nm{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .sub{font:12px system-ui,sans-serif;color:var(--muted)}
+.item button{padding:5px 10px;font-size:14px}
+.msg{font:13px system-ui,sans-serif;color:var(--muted);margin:0}
+body.clean .ctrl{display:none}
+#showCtrl{display:none;position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel);opacity:.85}
+body.clean #showCtrl{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel ctrl">
+    <div class="row">
+      <label for="center">Center word</label>
+      <input type="text" id="center" value="Key Points" autocomplete="off">
+    </div>
+    <div class="row" style="margin-top:6px">
+      <label for="kw">Add keyword</label>
+      <input type="text" id="kw" placeholder="Word, or several with commas" autocomplete="off" enterkeyhint="done">
+      <button class="primary" id="add">Add</button>
+    </div>
+    <div class="row tools">
+      <button id="undo">Undo</button>
+      <button id="shuffle">Shuffle</button>
+      <button id="clear">Clear</button>
+      <button id="saved">Save / Open</button>
+      <button id="clean">Hide</button>
+    </div>
+  </div>
+  <div id="area"><div id="frame"><div id="stage"><span id="meas" class="w"></span></div></div></div>
+</div>
+<button id="showCtrl">Show controls</button>
+<div id="modal" hidden>
+  <div class="sheet" role="dialog" aria-label="Saved clouds">
+    <h2>Saved clouds</h2>
+    <div class="row">
+      <input type="text" id="saveName" placeholder="Name this cloud" autocomplete="off">
+      <button class="primary" id="doSave">Save</button>
+    </div>
+    <p class="msg" id="saveMsg"></p>
+    <div id="list"></div>
+    <button id="closeModal">Close</button>
+  </div>
+</div>
+
+
+<script>
+const W=900,H=1100,CX=W/2,CY=H/2,PAD=4,MARGIN=14;
+const PALETTE=['#5c0612','#7a0e1c','#9c1a2e','#b0243a','#b4461c','#c0621a','#c8900a','#2b1512','#3e1d16'];
+const $=id=>document.getElementById(id);
+const stage=$('stage'),frame=$('frame'),meas=$('meas'),area=$('area');
+const centerIn=$('center'),kwIn=$('kw');
+let state={center:'Key Points',words:[]};
+let boxes=[];
+let db=null,uid=null,cloudsCol=null,currentDoc=null,savedList=[],syncTimer=null;
+
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function save(){
+  try{localStorage.setItem('kwcloud',JSON.stringify(state))}catch(e){}
+  if(currentDoc){clearTimeout(syncTimer);syncTimer=setTimeout(()=>{currentDoc.set(clone(state)).catch(()=>{})},800)}
+}
+function loadLocal(){try{const s=JSON.parse(localStorage.getItem('kwcloud')||'null');if(s&&s.words)state=s}catch(e){}}
+
+function fit(){const s=Math.min(area.clientWidth/W,area.clientHeight/H);stage.style.transform=`scale(${s})`;frame.style.width=(W*s)+'px';frame.style.height=(H*s)+'px'}
+
+function measure(text,size,weight){
+  meas.style.fontSize=size+'px';meas.style.fontWeight=weight;meas.textContent=text;
+  return {w:meas.offsetWidth,h:meas.offsetHeight};
+}
+function hit(a){
+  if(a.x<MARGIN||a.y<MARGIN||a.x+a.w>W-MARGIN||a.y+a.h>H-MARGIN)return true;
+  for(const b of boxes){
+    if(a.x<b.x+b.w+PAD&&a.x+a.w+PAD>b.x&&a.y<b.y+b.h+PAD&&a.y+a.h+PAD>b.y)return true;
+  }
+  return false;
+}
+function spiral(w,h){
+  const start=Math.random()*Math.PI*2,dir=Math.random()<.5?1:-1;
+  let t=0;
+  while(t<400){
+    const r=4*t,ang=start+dir*t;
+    const x=CX+r*Math.cos(ang)*0.95,y=CY+r*Math.sin(ang)*1.15;
+    const a={x:x-w/2,y:y-h/2,w,h};
+    if(!hit(a))return a;
+    t+=Math.min(0.25,5/Math.max(r,1));
+    if(r>900)break;
+  }
+  return null;
+}
+function randSize(){
+  const p=Math.random();
+  if(p<.1)return 96+Math.random()*30;
+  if(p<.35)return 62+Math.random()*26;
+  return 34+Math.random()*24;
+}
+function makeWord(text){
+  return {text,size:Math.round(randSize()),rot:Math.random()<.28,
+    color:PALETTE[Math.floor(Math.random()*PALETTE.length)],
+    weight:Math.random()<.5?600:500,id:Date.now()+'-'+Math.floor(Math.random()*1e6)};
+}
+function placeWord(wd){
+  let size=wd.size;
+  for(let k=0;k<9;k++){
+    const m=measure(wd.text,size,wd.weight);
+    const w=wd.rot?m.h:m.w,h=wd.rot?m.w:m.h;
+    const box=spiral(w,h);
+    if(box){boxes.push(box);return {size,box,m}}
+    size*=0.82;if(size<14)break;
+  }
+  return null;
+}
+function drawWord(wd,p,isNew,isCenter){
+  const el=document.createElement('span');
+  el.className='w'+(isNew?' new':'')+(isCenter?' center':'');
+  el.style.fontSize=p.size+'px';el.style.fontWeight=wd.weight;el.style.color=wd.color;
+  const cx=p.box.x+p.box.w/2,cy=p.box.y+p.box.h/2;
+  el.style.left=(cx-p.m.w/2)+'px';el.style.top=(cy-p.m.h/2)+'px';
+  if(wd.rot)el.style.transform='rotate(90deg)';
+  const inner=document.createElement('span');inner.className='in';inner.textContent=wd.text;
+  el.appendChild(inner);
+  if(!isCenter){el.title='Tap to remove';el.addEventListener('click',()=>{state.words=state.words.filter(x=>x.id!==wd.id);save();layout(false,true)})}
+  stage.appendChild(el);
+}
+// reuse=true keeps each word where it was placed before
+function layout(animateAll,reuse){
+  [...stage.querySelectorAll('.w:not(#meas)')].forEach(e=>e.remove());
+  boxes=[];
+  const c=state.center.trim()||' ';
+  const t=measure(c,200,700);
+  const size=Math.min(300,200*(W*0.86)/Math.max(t.w,1));
+  const m=measure(c,size,700);
+  const box={x:CX-m.w/2,y:CY-m.h/2,w:m.w,h:m.h};
+  boxes.push(box);
+  drawWord({text:c,weight:700,color:'#5c0612',rot:false},{size,box,m},false,true);
+  if(reuse){state.words.forEach(wd=>{if(wd.p)boxes.push(wd.p.box)})}
+  const order=[...state.words].sort((a,b)=>b.size-a.size);
+  for(const wd of order){
+    if(reuse&&wd.p){drawWord(wd,wd.p,animateAll,false);continue}
+    const p=placeWord(wd);
+    if(p){wd.p=p;drawWord(wd,p,animateAll,false)}else{wd.p=null}
+  }
+}
+function addWords(){
+  const parts=kwIn.value.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!parts.length)return;
+  let failed=0;
+  parts.forEach((txt,i)=>{
+    const wd=makeWord(txt);
+    const p=placeWord(wd);
+    if(p){wd.p=p;state.words.push(wd);setTimeout(()=>drawWord(wd,p,true,false),i*120)}else failed++;
+  });
+  save();kwIn.value='';kwIn.focus();
+  if(failed)kwIn.placeholder='Cloud is full. Remove a word or shuffle.';
+}
+$('add').onclick=addWords;
+kwIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addWords()}});
+centerIn.addEventListener('input',()=>{state.center=centerIn.value;save();layout(false,false)});
+$('undo').onclick=()=>{state.words.pop();save();layout(false,true)};
+$('shuffle').onclick=()=>{state.words.forEach(w=>{w.rot=Math.random()<.28;w.color=PALETTE[Math.floor(Math.random()*PALETTE.length)]});layout(true,false);save()};
+$('clear').onclick=()=>{if(state.words.length&&!confirm('Remove all keywords? Saved clouds are not affected.'))return;state.words=[];save();layout(false,true)};
+$('clean').onclick=()=>{document.body.classList.add('clean');fit()};
+$('showCtrl').onclick=()=>{document.body.classList.remove('clean');fit()};
+window.addEventListener('resize',fit);
+
+// ---------- Saved clouds ----------
+const modal=$('modal'),list=$('list'),msg=$('saveMsg'),nameIn=$('saveName');
+function fmtDate(ts){try{return new Date(ts).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){return ''}}
+function renderList(){
+  list.textContent='';
+  if(!cloudsCol){msg.textContent='Saving to your account is not available in this view. Open the page from its claude.ai link to save and reopen clouds.';return}
+  if(!savedList.length){const p=document.createElement('p');p.className='msg';p.textContent='No saved clouds yet. Name this one and tap Save.';list.appendChild(p);return}
+  savedList.forEach(doc=>{
+    const d=doc.data();
+    const row=document.createElement('div');row.className='item';
+    const meta=document.createElement('div');meta.className='meta';
+    const nm=document.createElement('div');nm.className='nm';nm.textContent=d.name||'Untitled';
+    const sub=document.createElement('div');sub.className='sub';sub.textContent=`${d.center||''} · ${(d.words||[]).length} words · ${fmtDate(d.savedAt)}`;
+    meta.append(nm,sub);
+    const open=document.createElement('button');open.textContent='Open';
+    open.onclick=()=>{state={center:d.center||'',words:clone(d.words||[])};centerIn.value=state.center;save();layout(true,true);nameIn.value=d.name||'';modal.hidden=true};
+    const del=document.createElement('button');del.textContent='Delete';
+    del.onclick=async()=>{if(!confirm(`Delete "${d.name}"?`))return;try{await cloudsCol.doc(doc.id).delete()}catch(e){msg.textContent='Could not delete. Try again.'}};
+    row.append(meta,open,del);list.appendChild(row);
+  });
+}
+$('saved').onclick=()=>{msg.textContent='';renderList();modal.hidden=false;nameIn.focus()};
+$('closeModal').onclick=()=>{modal.hidden=true};
+modal.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true});
+$('doSave').onclick=async()=>{
+  if(!cloudsCol){renderList();return}
+  const name=nameIn.value.trim();
+  if(!name){msg.textContent='Type a name first.';nameIn.focus();return}
+  const existing=savedList.find(d=>(d.data().name||'').toLowerCase()===name.toLowerCase());
+  if(existing&&!confirm(`Replace the saved cloud "${name}"?`))return;
+  const body={name,center:state.center,words:clone(state.words),savedAt:Date.now()};
+  try{
+    await (existing?cloudsCol.doc(existing.id):cloudsCol.doc()).set(body);
+    msg.textContent=`Saved "${name}".`;
+  }catch(e){msg.textContent=e&&e.code==='quota_exceeded'?'Storage is full. Delete an old cloud first.':'Could not save. Try again.'}
+};
+
+(async()=>{
+  loadLocal();centerIn.value=state.center;
+  fit();
+  try{await Promise.all([document.fonts.load('700 60px Oswald'),document.fonts.load('600 60px Oswald'),document.fonts.load('500 60px Oswald')]);}catch(e){}
+  layout(true,true);save();
+  try{
+    const [d,u]=await Promise.all([claude.use('db'),claude.use('user')]);
+    if(!d||!u)return;
+    const id=await u.id();
+    if(!id)return;
+    db=d;uid=id;
+    const profile=db.doc(`data/users/${uid}/profile`);
+    cloudsCol=profile.collection('clouds');
+    currentDoc=db.doc(`data/users/${uid}/current`);
+    const cur=await currentDoc.get();
+    if(cur.exists){const c=cur.data();if(c&&Array.isArray(c.words)){state=clone(c);centerIn.value=state.center;try{localStorage.setItem('kwcloud',JSON.stringify(state))}catch(e){};layout(false,true)}}
+    cloudsCol.orderBy('savedAt','desc').onSnapshot(snap=>{savedList=snap.docs;if(!modal.hidden)renderList()},()=>{});
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
